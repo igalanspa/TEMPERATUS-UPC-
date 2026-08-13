@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro T° y Humedad — UPC Clínica IST</title>
+<style>
+  :root{
+    --azul:#1e4e79; --azul-claro:#eaf1f8; --borde:#c9d4e0;
+    --ok:#1a7f37; --alerta:#b42318; --alerta-bg:#fdecea;
+    --gris:#5c6670;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",Arial,sans-serif;background:#f4f6f9;color:#1c2733}
+  header.app{background:var(--azul);color:#fff;padding:12px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header.app img{height:44px;background:#fff;border-radius:6px;padding:3px}
+  header.app .t1{font-size:17px;font-weight:700;letter-spacing:.3px}
+  header.app .t2{font-size:12px;opacity:.85}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 18px;background:#fff;border-bottom:1px solid var(--borde);position:sticky;top:0;z-index:20}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1px solid var(--borde);background:#fff;border-radius:20px;padding:7px 14px;font-size:13px;cursor:pointer;font-weight:600;color:var(--gris)}
+  .chip.on{background:var(--azul);border-color:var(--azul);color:#fff}
+  select,input[type=number]{border:1px solid var(--borde);border-radius:6px;padding:7px 9px;font-size:13px;background:#fff}
+  .btn{border:none;border-radius:6px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn.primary{background:var(--azul);color:#fff}
+  .btn.ghost{background:#fff;color:var(--azul);border:1px solid var(--azul)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .spacer{flex:1}
+  #estado{font-size:12.5px;color:var(--gris);min-width:130px;text-align:right}
+  #estado.ok{color:var(--ok)} #estado.err{color:var(--alerta)}
+  .resumen{display:flex;gap:18px;padding:9px 18px;font-size:12.5px;color:var(--gris);background:#fbfcfe;border-bottom:1px solid var(--borde);flex-wrap:wrap}
+  .resumen b{color:#1c2733}
+  .resumen .fuera b{color:var(--alerta)}
+  .criterio{font-size:12.5px;background:var(--azul-claro);border:1px solid var(--borde);border-radius:6px;padding:4px 10px}
+  main{padding:14px 18px 60px}
+  .tblwrap{overflow-x:auto;background:#fff;border:1px solid var(--borde);border-radius:8px}
+  table.grid{border-collapse:collapse;width:100%;min-width:900px;font-size:13px}
+  table.grid th{background:var(--azul-claro);color:#1c2733;padding:8px 6px;border:1px solid var(--borde);font-size:12px;position:sticky;top:0}
+  table.grid td{border:1px solid var(--borde);padding:2px;text-align:center}
+  table.grid td.dia{font-weight:700;background:#f7f9fc;width:44px}
+  table.grid tr.sep td{border-top:2px solid #9fb2c6}
+  table.grid input{width:100%;border:none;padding:7px 6px;font-size:13px;text-align:center;background:transparent;outline:none}
+  table.grid input:focus{background:#fffbe8}
+  table.grid td.obs input{text-align:left}
+  table.grid input.bad{background:var(--alerta-bg);color:var(--alerta);font-weight:700}
+  table.grid select.sel-persona{width:100%;border:none;padding:6px 2px;font-size:12.5px;background:transparent;outline:none;text-align:center;text-align-last:center;cursor:pointer;appearance:auto}
+  table.grid select.sel-persona:focus{background:#fffbe8}
+  td.c-hora{width:70px} td.c-num{width:85px} td.c-per{width:150px}
+  .hoy td.dia{background:#fff3cd}
+  footer{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--borde);padding:6px 18px;font-size:11.5px;color:var(--gris);display:flex;justify-content:space-between}
+  #printArea{display:none}
+  /* ============ IMPRESIÓN: réplica del formato Word ============ */
+  @media print{
+    body{background:#fff}
+    header.app,.toolbar,.resumen,main,footer{display:none!important}
+    #printArea{display:block}
+    @page{size:letter portrait;margin:11mm 14mm}
+    .pagina{page-break-after:always}
+    .pagina:last-child{page-break-after:auto}
+  }
+  #printArea{font-family:Arial,Helvetica,sans-serif;color:#000}
+  #printArea table{border-collapse:collapse;width:100%}
+  #printArea .hdr td{border:1px solid #000;padding:2px 4px;font-size:8.5pt;vertical-align:middle}
+  #printArea .hdr .logo{width:78px;text-align:center}
+  #printArea .hdr .logo img{width:64px}
+  #printArea .hdr .svc{text-align:center;font-weight:bold;font-size:10pt}
+  #printArea .hdr .meta1{width:88px;font-size:8pt}
+  #printArea .hdr .meta2{width:80px;font-size:8pt;text-align:center}
+  #printArea .hdr .titulo{text-align:center;font-weight:bold;font-size:10.5pt;padding:4px}
+  #printArea .hdr .lbl{font-weight:bold;background:#f2f2f2;text-align:center}
+  #printArea .datos th{border:1px solid #000;background:#e8eef5;font-size:8.5pt;padding:3px 2px}
+  #printArea .datos td{border:1px solid #000;font-size:8.5pt;padding:2.5px 3px;text-align:center;height:13px}
+  #printArea .datos td.obs{text-align:left}
+  #printArea .datos td.fuera{font-weight:bold}
+</style>
+</head>
+<body>
+<header class="app">
+  <img id="logoTop" alt="Clínica IST">
+  <div>
+    <div class="t1">REGISTRO CONTROL DE TEMPERATURA Y HUMEDAD DE INSUMOS</div>
+    <div class="t2">SERVICIO DE UPC — CLÍNICA IST &nbsp;·&nbsp; Código CLC DOC 34 · Edición 1 · Vigencia ENERO 2026</div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="chips" id="chipsArea"></div>
+  <select id="selMes"></select>
+  <input type="number" id="inpAnio" min="2024" max="2100" style="width:80px">
+  <span class="criterio" id="lblCriterio"></span>
+  <div class="spacer"></div>
+  <button class="btn ghost" id="btnPersona">👤 Agregar persona</button>
+  <button class="btn ghost" id="btnWord">⬇ Word (.docx)</button>
+  <button class="btn primary" id="btnPrint">🖨 Imprimir / PDF</button>
+  <div id="estado">Cargando…</div>
+</div>
+
+<div class="resumen">
+  <span>Registros completados: <b id="rCompletos">0</b> de <b id="rTotales">0</b></span>
+  <span class="fuera">Mediciones fuera de rango: <b id="rFuera">0</b></span>
+  <span>Último guardado: <b id="rGuardado">—</b></span>
+</div>
+
+<main>
+  <div class="tblwrap">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th>Día</th><th>Hora</th><th>T° Actual (°C)</th><th>%HR Actual (%)</th>
+          <th>Ejecutado por</th><th>Verificado por</th><th>Observaciones</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<footer>
+  <span>Servicio de UPC · Clínica IST — registro digital con respaldo en la nube (Supabase)</span>
+  <span>Los datos se guardan automáticamente al editar</span>
+</footer>
+
+<div id="printArea"></div>
+
+<script src="docx.iife.js" onerror="this.remove();var s=document.createElement('script');s.src='https://unpkg.com/docx@9.7.1/dist/index.iife.js';document.body.appendChild(s)"></script>
+<script>
+/* ================== CONFIGURACIÓN ================== */
+const SUPA_URL = "https://jsxhknlwuxwvdoamtqkh.supabase.co";
+const SUPA_KEY = "sb_publishable_IYOEpsuj8Ev4pEOroRT6eg_6gRUg69L";
+const TABLA = "registros_th";
+
+const LOGO_B64 = "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";
+
+const AREAS = {
+  "REFRIGERADOR UPC": { tMin:2,  tMax:8,  hMin:40, hMax:70, tLbl:"2°C - 8°C",   hLbl:"40% - 70%" },
+  "RELOJ 1 UPC":      { tMin:18, tMax:24, hMin:30, hMax:50, tLbl:"18°C - 24°C", hLbl:"30% - 50%" },
+  "RELOJ 2 UPC":      { tMin:18, tMax:24, hMin:30, hMax:50, tLbl:"18°C - 24°C", hLbl:"30% - 50%" },
+  "RELOJ 3 UPC":      { tMin:18, tMax:24, hMin:30, hMax:50, tLbl:"18°C - 24°C", hLbl:"30% - 50%" }
+};
+const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+const META = { caract:"APF 1.5", codigo:"CLC DOC 34", edicion:"1", vigencia:"ENERO 2026" };
+const HORA_DEF = { AM:"09:00", PM:"21:00" };
+const CAMPOS = ["hora","temperatura","humedad","ejecutado_por","verificado_por","observaciones"];
+const AGREGAR = "__agregar__";
+
+/* ================== ESTADO ================== */
+let area = "REFRIGERADOR UPC";
+const hoy = new Date();
+let mes = hoy.getMonth()+1, anio = hoy.getFullYear();
+let datos = {};          // clave "dia-turno" -> fila
+let pendientes = new Set();
+let timerGuardar = null;
+
+const $ = id => document.getElementById(id);
+const diasMes = () => new Date(anio, mes, 0).getDate();
+const clave = (d,t) => d+"-"+t;
+
+function filaVacia(d,t){
+  return { area, anio, mes, dia:d, turno:t, hora:HORA_DEF[t],
+           temperatura:null, humedad:null, ejecutado_por:"", verificado_por:"", observaciones:"" };
+}
+function fueraT(v){ const a=AREAS[area]; return v!=null && v!=="" && (Number(v)<a.tMin || Number(v)>a.tMax); }
+function fueraH(v){ const a=AREAS[area]; return v!=null && v!=="" && (Number(v)<a.hMin || Number(v)>a.hMax); }
+
+/* ================== API SUPABASE (REST) ================== */
+const cab = { "apikey":SUPA_KEY, "Authorization":"Bearer "+SUPA_KEY, "Content-Type":"application/json" };
+
+/* ================== NÓMINA DE PERSONAL ================== */
+let personal = [];
+async function cargarPersonal(){
+  try{
+    const r = await fetch(`${SUPA_URL}/rest/v1/personal?activo=eq.true&select=nombre,rol&order=nombre`,{headers:cab});
+    if(r.ok) personal = await r.json();
+  }catch(e){ /* sin conexión: los selects mostrarán solo valores ya registrados */ }
+}
+async function agregarPersona(){
+  const nombre = (prompt("Nombre y apellido de la persona a agregar:")||"").trim().toUpperCase();
+  if(!nombre) return null;
+  let rol = (prompt("Rol: EU o TENS","TENS")||"TENS").trim().toUpperCase();
+  if(rol!=="EU" && rol!=="TENS") rol = "OTRO";
+  try{
+    const r = await fetch(`${SUPA_URL}/rest/v1/personal`,{
+      method:"POST", headers:{...cab,"Prefer":"return=minimal"},
+      body:JSON.stringify({nombre, rol})
+    });
+    if(!r.ok && r.status!==409) throw new Error(r.status);
+  }catch(e){ alert("No se pudo guardar la persona (revisa la conexión)"); return null; }
+  if(!personal.some(p=>p.nombre===nombre)) personal.push({nombre,rol});
+  personal.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  return nombre;
+}
+function selPersona(f,campo){
+  const sel = document.createElement("select");
+  sel.className = "sel-persona";
+  const actual = f[campo] || "";
+  const nombres = personal.map(p=>p.nombre);
+  if(actual && !nombres.includes(actual)) nombres.unshift(actual); // valores antiguos
+  sel.appendChild(new Option("—",""));
+  nombres.forEach(n=> sel.appendChild(new Option(n,n)));
+  sel.appendChild(new Option("➕ Agregar persona…", AGREGAR));
+  sel.value = actual;
+  sel.addEventListener("change", async ()=>{
+    if(sel.value === AGREGAR){
+      const nuevo = await agregarPersona();
+      if(nuevo){ f[campo] = nuevo; pendientes.add(clave(f.dia,f.turno)); programarGuardado(); }
+      render();
+      return;
+    }
+    f[campo] = sel.value;
+    pendientes.add(clave(f.dia,f.turno));
+    programarGuardado();
+  });
+  return sel;
+}
+
+async function cargar(){
+  estado("Cargando…","");
+  datos = {};
+  try{
+    const q = `${SUPA_URL}/rest/v1/${TABLA}?area=eq.${encodeURIComponent(area)}&anio=eq.${anio}&mes=eq.${mes}&select=*`;
+    const r = await fetch(q,{headers:cab});
+    if(!r.ok) throw new Error(r.status);
+    (await r.json()).forEach(f => datos[clave(f.dia,f.turno)] = f);
+    estado("Listo","ok");
+  }catch(e){
+    estado("⚠ Sin conexión con la base","err");
+  }
+  render();
+}
+
+async function guardar(){
+  if(!pendientes.size) return;
+  const filas = [...pendientes].map(k => {
+    const f = datos[k];
+    return { area:f.area, anio:f.anio, mes:f.mes, dia:f.dia, turno:f.turno,
+      hora:f.hora||null,
+      temperatura:(f.temperatura===""||f.temperatura==null)?null:Number(f.temperatura),
+      humedad:(f.humedad===""||f.humedad==null)?null:Number(f.humedad),
+      ejecutado_por:f.ejecutado_por||null, verificado_por:f.verificado_por||null,
+      observaciones:f.observaciones||null, updated_at:new Date().toISOString() };
+  });
+  estado("Guardando…","");
+  try{
+    const r = await fetch(`${SUPA_URL}/rest/v1/${TABLA}?on_conflict=area,anio,mes,dia,turno`,{
+      method:"POST",
+      headers:{...cab,"Prefer":"resolution=merge-duplicates,return=minimal"},
+      body:JSON.stringify(filas)
+    });
+    if(!r.ok) throw new Error(r.status);
+    pendientes.clear();
+    const h = new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
+    $("rGuardado").textContent = h;
+    estado("✓ Guardado "+h,"ok");
+  }catch(e){
+    estado("⚠ No se pudo guardar — reintentando","err");
+    setTimeout(guardar, 5000);
+  }
+}
+function programarGuardado(){
+  clearTimeout(timerGuardar);
+  timerGuardar = setTimeout(guardar, 900);
+}
+function estado(txt,cls){ const e=$("estado"); e.textContent=txt; e.className=cls; }
+
+/* ================== INTERFAZ ================== */
+function render(){
+  const tb = $("tbody"); tb.innerHTML = "";
+  const n = diasMes();
+  const esMesActual = (anio===hoy.getFullYear() && mes===hoy.getMonth()+1);
+  for(let d=1; d<=n; d++){
+    ["AM","PM"].forEach((t,i)=>{
+      const f = datos[clave(d,t)] || (datos[clave(d,t)] = filaVacia(d,t));
+      const tr = document.createElement("tr");
+      if(i===0) tr.className = "sep";
+      if(esMesActual && d===hoy.getDate()) tr.classList.add("hoy");
+      if(i===0){
+        const td = document.createElement("td");
+        td.className="dia"; td.rowSpan=2; td.textContent=d;
+        tr.appendChild(td);
+      }
+      tr.appendChild(celda(f,"hora","c-hora","text"));
+      tr.appendChild(celda(f,"temperatura","c-num","number"));
+      tr.appendChild(celda(f,"humedad","c-num","number"));
+      tr.appendChild(celda(f,"ejecutado_por","c-per","text"));
+      tr.appendChild(celda(f,"verificado_por","c-per","text"));
+      tr.appendChild(celda(f,"observaciones","obs","text"));
+      tb.appendChild(tr);
+    });
+  }
+  actualizarResumen();
+}
+function celda(f,campo,cls,tipo){
+  const td = document.createElement("td"); td.className = cls;
+  if(campo==="ejecutado_por" || campo==="verificado_por"){
+    td.appendChild(selPersona(f,campo));
+    return td;
+  }
+  const inp = document.createElement("input");
+  inp.type = tipo; if(tipo==="number") inp.step="0.1";
+  inp.value = f[campo] ?? "";
+  marcar(inp,campo,f[campo]);
+  inp.addEventListener("input", ()=>{
+    f[campo] = inp.value;
+    marcar(inp,campo,inp.value);
+    pendientes.add(clave(f.dia,f.turno));
+    actualizarResumen();
+    programarGuardado();
+  });
+  td.appendChild(inp);
+  return td;
+}
+function marcar(inp,campo,v){
+  inp.classList.toggle("bad", (campo==="temperatura"&&fueraT(v)) || (campo==="humedad"&&fueraH(v)));
+}
+function actualizarResumen(){
+  const n = diasMes(); let comp=0, fuera=0;
+  for(let d=1;d<=n;d++) for(const t of ["AM","PM"]){
+    const f = datos[clave(d,t)]; if(!f) continue;
+    const hayT = f.temperatura!=null && f.temperatura!=="";
+    const hayH = f.humedad!=null && f.humedad!=="";
+    if(hayT && hayH) comp++;
+    if(fueraT(f.temperatura)) fuera++;
+    if(fueraH(f.humedad)) fuera++;
+  }
+  $("rCompletos").textContent = comp;
+  $("rTotales").textContent = n*2;
+  $("rFuera").textContent = fuera;
+}
+function montarControles(){
+  const ch = $("chipsArea");
+  ch.innerHTML = "";
+  Object.keys(AREAS).forEach(a=>{
+    const b = document.createElement("button");
+    b.className = "chip"+(a===area?" on":"");
+    b.textContent = a;
+    b.onclick = async ()=>{ await guardar(); area=a; montarControles(); cargar(); };
+    ch.appendChild(b);
+  });
+  const sm = $("selMes"); sm.innerHTML="";
+  MESES.forEach((m,i)=>{
+    const o = document.createElement("option");
+    o.value=i+1; o.textContent=m; if(i+1===mes) o.selected=true;
+    sm.appendChild(o);
+  });
+  $("inpAnio").value = anio;
+  const a = AREAS[area];
+  $("lblCriterio").textContent = `Criterio: T° ${a.tLbl} · HR ${a.hLbl}`;
+}
+$("selMes").addEventListener("change", async e=>{ await guardar(); mes=+e.target.value; cargar(); });
+$("inpAnio").addEventListener("change", async e=>{ await guardar(); anio=+e.target.value||anio; e.target.value=anio; cargar(); });
+
+/* ================== IMPRESIÓN ================== */
+function valTxt(v,suf){ return (v==null||v==="")?"":(v+(suf||"")); }
+function encabezadoHTML(pag){
+  const a = AREAS[area];
+  return `<table class="hdr">
+    <tr><td class="logo" rowspan="5"><img src="data:image/png;base64,${LOGO_B64}"></td>
+        <td class="svc" rowspan="5" colspan="2">SERVICIO DE UPC<br>CLÍNICA IST</td>
+        <td class="meta1">Característica</td><td class="meta2">${META.caract}</td></tr>
+    <tr><td class="meta1">Código</td><td class="meta2">${META.codigo}</td></tr>
+    <tr><td class="meta1">Edición</td><td class="meta2">${META.edicion}</td></tr>
+    <tr><td class="meta1">Página</td><td class="meta2">${pag} de 2</td></tr>
+    <tr><td class="meta1">Vigencia</td><td class="meta2">${META.vigencia}</td></tr>
+    <tr><td class="titulo" colspan="5">REGISTRO CONTROL DE TEMPERATURA Y HUMEDAD DE INSUMOS</td></tr>
+    <tr><td class="lbl">ÁREA</td><td style="text-align:center;font-weight:bold">${area}</td>
+        <td colspan="3" style="text-align:center;font-weight:bold">MES Y AÑO: ${MESES[mes-1]} ${anio}</td></tr>
+    <tr><td class="lbl">CRITERIO DE ACEPTACIÓN</td>
+        <td style="text-align:center">TEMPERATURA (T °C): ${a.tLbl}</td>
+        <td colspan="3" style="text-align:center">%HUMEDAD RELATIVA (%HR): ${a.hLbl}</td></tr>
+  </table>`;
+}
+function tablaHTML(d1,d2){
+  let filas = "";
+  for(let d=d1; d<=d2; d++) for(const t of ["AM","PM"]){
+    const f = datos[clave(d,t)] || filaVacia(d,t);
+    filas += `<tr>
+      <td>${d}</td><td>${f.hora||HORA_DEF[t]}</td>
+      <td class="${fueraT(f.temperatura)?'fuera':''}">${valTxt(f.temperatura,"°")}</td>
+      <td class="${fueraH(f.humedad)?'fuera':''}">${valTxt(f.humedad,"%")}</td>
+      <td>${f.ejecutado_por||""}</td><td>${f.verificado_por||""}</td>
+      <td class="obs">${f.observaciones||""}</td></tr>`;
+  }
+  return `<table class="datos">
+    <tr><th style="width:5%">Día</th><th style="width:8%">Hora</th><th style="width:11%">T °Actual. (°C)</th>
+    <th style="width:11%">%HR Actual. %</th><th style="width:19%">Ejecutado por</th>
+    <th style="width:19%">Verificado por</th><th>Observaciones</th></tr>${filas}</table>`;
+}
+$("btnPrint").onclick = async ()=>{
+  await guardar();
+  const n = diasMes();
+  $("printArea").innerHTML =
+    `<div class="pagina">${encabezadoHTML(1)}<div style="height:6px"></div>${tablaHTML(1,16)}</div>`+
+    `<div class="pagina">${encabezadoHTML(2)}<div style="height:6px"></div>${tablaHTML(17,n)}</div>`;
+  window.print();
+};
+
+/* ================== WORD (.docx) ================== */
+function b64aU8(b64){
+  const bin = atob(b64), u8 = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+  return u8;
+}
+$("btnWord").onclick = async ()=>{
+  await guardar();
+  const D = docx, a = AREAS[area], n = diasMes();
+  const NEGRO = "000000";
+  const borde = {style:D.BorderStyle.SINGLE,size:4,color:NEGRO};
+  const bordes = {top:borde,bottom:borde,left:borde,right:borde};
+  const mCel = {top:30,bottom:30,left:60,right:60};
+
+  const txt = (t,opt={}) => new D.Paragraph({
+    alignment: opt.izq ? D.AlignmentType.LEFT : D.AlignmentType.CENTER,
+    children:[ new D.TextRun({text:String(t??""),bold:!!opt.b,size:opt.s||17,font:"Arial"}) ]
+  });
+  const celdaW = (t,opt={}) => new D.TableCell({
+    borders:bordes, margins:mCel,
+    columnSpan:opt.cs, rowSpan:opt.rs,
+    shading: opt.gris ? {fill:"F2F2F2"} : (opt.azul ? {fill:"E8EEF5"} : undefined),
+    verticalAlign: D.VerticalAlign.CENTER,
+    width: opt.w ? {size:opt.w,type:D.WidthType.DXA} : undefined,
+    children:[ Array.isArray(t)?t[0]:txt(t,opt) ]
+  });
+
+  function encabezadoW(pag){
+    const logo = new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[
+      new D.ImageRun({type:"png",data:b64aU8(LOGO_B64),transformation:{width:62,height:47}})
+    ]});
+    return [
+      new D.Table({width:{size:8838,type:D.WidthType.DXA},rows:[
+        new D.TableRow({children:[
+          new D.TableCell({borders:bordes,margins:mCel,rowSpan:5,verticalAlign:D.VerticalAlign.CENTER,width:{size:1100,type:D.WidthType.DXA},children:[logo]}),
+          new D.TableCell({borders:bordes,margins:mCel,rowSpan:5,columnSpan:2,verticalAlign:D.VerticalAlign.CENTER,width:{size:4538,type:D.WidthType.DXA},
+            children:[txt("SERVICIO DE UPC",{b:1,s:20}),txt("CLÍNICA IST",{b:1,s:20})]}),
+          celdaW("Característica",{w:1700,s:15}), celdaW(META.caract,{w:1500,s:15})
+        ]}),
+        new D.TableRow({children:[celdaW("Código",{s:15}),celdaW(META.codigo,{s:15})]}),
+        new D.TableRow({children:[celdaW("Edición",{s:15}),celdaW(META.edicion,{s:15})]}),
+        new D.TableRow({children:[celdaW("Página",{s:15}),celdaW(pag+" de 2",{s:15})]}),
+        new D.TableRow({children:[celdaW("Vigencia",{s:15}),celdaW(META.vigencia,{s:15})]}),
+        new D.TableRow({children:[celdaW("REGISTRO CONTROL DE TEMPERATURA Y HUMEDAD DE INSUMOS",{cs:5,b:1,s:21})]}),
+        new D.TableRow({children:[
+          celdaW("ÁREA",{b:1,gris:1,w:2300}), celdaW(area,{b:1,w:2400}),
+          celdaW("MES Y AÑO: "+MESES[mes-1]+" "+anio,{cs:3,b:1})
+        ]}),
+        new D.TableRow({children:[
+          celdaW("CRITERIO DE ACEPTACIÓN",{b:1,gris:1}),
+          celdaW("TEMPERATURA (T °C): "+a.tLbl,{}),
+          celdaW("%HUMEDAD RELATIVA (%HR): "+a.hLbl,{cs:3})
+        ]})
+      ]}),
+      new D.Paragraph({children:[],spacing:{after:60}})
+    ];
+  }
+
+  function tablaW(d1,d2){
+    const anchos = [500,750,1050,1050,1700,1700,2088];
+    const filas = [ new D.TableRow({tableHeader:true,children:
+      ["Día","Hora","T °Actual. (°C)","%HR Actual. %","Ejecutado por","Verificado por","Observaciones"]
+      .map((h,i)=>celdaW(h,{b:1,azul:1,w:anchos[i],s:16})) }) ];
+    for(let d=d1; d<=d2; d++) for(const t of ["AM","PM"]){
+      const f = datos[clave(d,t)] || filaVacia(d,t);
+      filas.push(new D.TableRow({children:[
+        celdaW(d,{w:anchos[0],s:16}),
+        celdaW(f.hora||HORA_DEF[t],{w:anchos[1],s:16}),
+        celdaW(valTxt(f.temperatura,"°"),{w:anchos[2],s:16,b:fueraT(f.temperatura)}),
+        celdaW(valTxt(f.humedad,"%"),{w:anchos[3],s:16,b:fueraH(f.humedad)}),
+        celdaW(f.ejecutado_por||"",{w:anchos[4],s:16}),
+        celdaW(f.verificado_por||"",{w:anchos[5],s:16}),
+        celdaW(f.observaciones||"",{w:anchos[6],s:16,izq:1})
+      ]}));
+    }
+    return new D.Table({width:{size:8838,type:D.WidthType.DXA},rows:filas});
+  }
+
+  const doc = new D.Document({sections:[{
+    properties:{page:{size:{width:12240,height:15840},margin:{top:900,bottom:700,left:1701,right:1701}}},
+    children:[
+      ...encabezadoW(1), tablaW(1,16),
+      new D.Paragraph({children:[],pageBreakBefore:true}),
+      ...encabezadoW(2), tablaW(17,n)
+    ]
+  }]});
+
+  const blob = await D.Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const el = document.createElement("a");
+  el.href = url;
+  el.download = `REGISTRO_THUMEDAD_UPC_${area.replace(/ /g,"_")}_${MESES[mes-1]}_${anio}.docx`;
+  el.click();
+  URL.revokeObjectURL(url);
+};
+
+/* ================== INICIO ================== */
+$("btnPersona").onclick = async ()=>{ const n = await agregarPersona(); if(n) render(); };
+$("logoTop").src = "data:image/png;base64," + LOGO_B64;
+window.addEventListener("beforeunload", ()=>{ if(pendientes.size) guardar(); });
+montarControles();
+cargarPersonal().then(cargar);
+</script>
+</body>
+</html>

@@ -43,6 +43,8 @@
   table.grid input:focus{background:#fffbe8}
   table.grid td.obs input{text-align:left}
   table.grid input.bad{background:var(--alerta-bg);color:var(--alerta);font-weight:700}
+  table.grid select.sel-persona{width:100%;border:none;padding:6px 2px;font-size:12.5px;background:transparent;outline:none;text-align:center;text-align-last:center;cursor:pointer;appearance:auto}
+  table.grid select.sel-persona:focus{background:#fffbe8}
   td.c-hora{width:70px} td.c-num{width:85px} td.c-per{width:150px}
   .hoy td.dia{background:#fff3cd}
   footer{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--borde);padding:6px 18px;font-size:11.5px;color:var(--gris);display:flex;justify-content:space-between}
@@ -87,6 +89,7 @@
   <input type="number" id="inpAnio" min="2024" max="2100" style="width:80px">
   <span class="criterio" id="lblCriterio"></span>
   <div class="spacer"></div>
+  <button class="btn ghost" id="btnPersona">👤 Agregar persona</button>
   <button class="btn ghost" id="btnWord">⬇ Word (.docx)</button>
   <button class="btn primary" id="btnPrint">🖨 Imprimir / PDF</button>
   <div id="estado">Cargando…</div>
@@ -138,6 +141,7 @@ const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO"
 const META = { caract:"APF 1.5", codigo:"CLC DOC 34", edicion:"1", vigencia:"ENERO 2026" };
 const HORA_DEF = { AM:"09:00", PM:"21:00" };
 const CAMPOS = ["hora","temperatura","humedad","ejecutado_por","verificado_por","observaciones"];
+const AGREGAR = "__agregar__";
 
 /* ================== ESTADO ================== */
 let area = "REFRIGERADOR UPC";
@@ -160,6 +164,54 @@ function fueraH(v){ const a=AREAS[area]; return v!=null && v!=="" && (Number(v)<
 
 /* ================== API SUPABASE (REST) ================== */
 const cab = { "apikey":SUPA_KEY, "Authorization":"Bearer "+SUPA_KEY, "Content-Type":"application/json" };
+
+/* ================== NÓMINA DE PERSONAL ================== */
+let personal = [];
+async function cargarPersonal(){
+  try{
+    const r = await fetch(`${SUPA_URL}/rest/v1/personal?activo=eq.true&select=nombre,rol&order=nombre`,{headers:cab});
+    if(r.ok) personal = await r.json();
+  }catch(e){ /* sin conexión: los selects mostrarán solo valores ya registrados */ }
+}
+async function agregarPersona(){
+  const nombre = (prompt("Nombre y apellido de la persona a agregar:")||"").trim().toUpperCase();
+  if(!nombre) return null;
+  let rol = (prompt("Rol: EU o TENS","TENS")||"TENS").trim().toUpperCase();
+  if(rol!=="EU" && rol!=="TENS") rol = "OTRO";
+  try{
+    const r = await fetch(`${SUPA_URL}/rest/v1/personal`,{
+      method:"POST", headers:{...cab,"Prefer":"return=minimal"},
+      body:JSON.stringify({nombre, rol})
+    });
+    if(!r.ok && r.status!==409) throw new Error(r.status);
+  }catch(e){ alert("No se pudo guardar la persona (revisa la conexión)"); return null; }
+  if(!personal.some(p=>p.nombre===nombre)) personal.push({nombre,rol});
+  personal.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  return nombre;
+}
+function selPersona(f,campo){
+  const sel = document.createElement("select");
+  sel.className = "sel-persona";
+  const actual = f[campo] || "";
+  const nombres = personal.map(p=>p.nombre);
+  if(actual && !nombres.includes(actual)) nombres.unshift(actual); // valores antiguos
+  sel.appendChild(new Option("—",""));
+  nombres.forEach(n=> sel.appendChild(new Option(n,n)));
+  sel.appendChild(new Option("➕ Agregar persona…", AGREGAR));
+  sel.value = actual;
+  sel.addEventListener("change", async ()=>{
+    if(sel.value === AGREGAR){
+      const nuevo = await agregarPersona();
+      if(nuevo){ f[campo] = nuevo; pendientes.add(clave(f.dia,f.turno)); programarGuardado(); }
+      render();
+      return;
+    }
+    f[campo] = sel.value;
+    pendientes.add(clave(f.dia,f.turno));
+    programarGuardado();
+  });
+  return sel;
+}
 
 async function cargar(){
   estado("Cargando…","");
@@ -239,6 +291,10 @@ function render(){
 }
 function celda(f,campo,cls,tipo){
   const td = document.createElement("td"); td.className = cls;
+  if(campo==="ejecutado_por" || campo==="verificado_por"){
+    td.appendChild(selPersona(f,campo));
+    return td;
+  }
   const inp = document.createElement("input");
   inp.type = tipo; if(tipo==="number") inp.step="0.1";
   inp.value = f[campo] ?? "";
@@ -435,10 +491,11 @@ $("btnWord").onclick = async ()=>{
 };
 
 /* ================== INICIO ================== */
+$("btnPersona").onclick = async ()=>{ const n = await agregarPersona(); if(n) render(); };
 $("logoTop").src = "data:image/png;base64," + LOGO_B64;
 window.addEventListener("beforeunload", ()=>{ if(pendientes.size) guardar(); });
 montarControles();
-cargar();
+cargarPersonal().then(cargar);
 </script>
 </body>
 </html>
